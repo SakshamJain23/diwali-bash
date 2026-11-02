@@ -203,9 +203,9 @@ export default function RocketDiwaliInvite() {
   const [strikeHeat, setStrikeHeat] = useState(0);
   const [fuseHeat, setFuseHeat] = useState(0);
   const [statusHint, setStatusHint] = useState("Scrub the matchstick FAST across the strip below!");
-  const [guestName, setGuestName] = useState<string>("VIP Guest");
   const [selectedRole, setSelectedRole] = useState<string>("Teen Patti Shark 🃏");
   const [muted, setMuted] = useState(false);
+  const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, complete: false });
   const [cursorPos, setCursorPos] = useState({ x: 500, y: 600 });
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -233,10 +233,26 @@ export default function RocketDiwaliInvite() {
       setCursorPos({ x: window.innerWidth * 0.24, y: window.innerHeight * 0.59 });
       pointerPos.current = { x: window.innerWidth * 0.24, y: window.innerHeight * 0.59 };
       lastPointerRef.current.time = Date.now();
-      const params = new URLSearchParams(window.location.search);
-      const name = params.get("guest");
-      if (name) setGuestName(name);
     }
+  }, []);
+
+  // Live countdown to 5 November 2026, 6:00 PM (Jaipur / IST).
+  useEffect(() => {
+    const target = new Date("2026-11-05T18:00:00+05:30").getTime();
+    const updateCountdown = () => {
+      const remaining = Math.max(0, target - Date.now());
+      const totalSeconds = Math.floor(remaining / 1000);
+      setCountdown({
+        days: Math.floor(totalSeconds / 86400),
+        hours: Math.floor((totalSeconds % 86400) / 3600),
+        minutes: Math.floor((totalSeconds % 3600) / 60),
+        seconds: totalSeconds % 60,
+        complete: remaining === 0,
+      });
+    };
+    updateCountdown();
+    const timer = window.setInterval(updateCountdown, 1000);
+    return () => window.clearInterval(timer);
   }, []);
 
   // Friction Cooling & Hold-on-Fuse Ignition Loop
@@ -469,7 +485,7 @@ export default function RocketDiwaliInvite() {
 
   const handleWhatsAppRSVP = () => {
     const text = encodeURIComponent(
-      `🚀 Yo Saksham! Your Rocket Invite just landed!\n\nCount me in for the Diwali Bash on 5th Nov (6 PM onwards)!\n👤 Guest: ${guestName}\n🎭 Vibe: ${selectedRole}\nLet's gooo! 🧨🔥`
+      `🚀 Your Rocket Invite just landed!\n\nCount me in for the Diwali Bash on 5th Nov (6 PM onwards)!\n🎭 Vibe: ${selectedRole}\nLet's gooo! 🧨🔥`
     );
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
@@ -539,7 +555,7 @@ export default function RocketDiwaliInvite() {
           <div className="flex items-center gap-2 rounded-full border border-amber-500/50 bg-[#1b0c04]/80 px-4 py-2 shadow-[0_0_25px_rgba(217,119,6,0.13)] backdrop-blur-md sm:px-6">
             <Sparkles className="h-3.5 w-3.5 text-amber-300" />
             <span className="text-[9px] font-semibold uppercase tracking-[0.19em] text-amber-200 sm:text-[11px] sm:tracking-[0.23em]">
-              VIP Invite <span className="px-1 text-amber-600">•</span> {guestName}
+              VIP DIWALI INVITATION
             </span>
           </div>
           <button
@@ -774,7 +790,7 @@ export default function RocketDiwaliInvite() {
 
               <div className="relative mb-5 space-y-1 text-center">
                 <p className="text-[10px] font-bold uppercase tracking-[0.32em] text-[#75400F]">You are invited to</p>
-                <h2 className="font-serif text-2xl font-bold tracking-tight text-[#3B1A08] drop-shadow-[0_1px_0_rgba(255,231,165,0.35)] sm:text-3xl">SAKSHAM&apos;S DIWALI ROYALE</h2>
+                <h2 className="font-serif text-2xl font-bold tracking-tight text-[#3B1A08] drop-shadow-[0_1px_0_rgba(255,231,165,0.35)] sm:text-3xl">DIWALI ROYALE</h2>
                 <p className="pt-1 font-serif text-sm italic text-[#633513]">Lights • Loved ones • A little beautiful chaos</p>
                 <div className="pt-2 text-[#7C410D]">✦ ❀ ✦</div>
               </div>
@@ -792,6 +808,28 @@ export default function RocketDiwaliInvite() {
                   <MapPin className="h-4 w-4 shrink-0 text-[#75400F]" />
                   <div><p className="text-[9px] font-semibold uppercase tracking-wider text-[#714016]/85">Venue</p><p className="text-xs font-bold text-[#351707]">Jaipur • Pin unlocks on WhatsApp RSVP</p></div>
                 </div>
+              </div>
+
+              <div className="relative mb-5 rounded-xl border border-[#7A3B10]/30 bg-[#7A3B10]/[0.08] px-3 py-3 text-center">
+                <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.22em] text-[#714016]/90">Countdown to the celebration</p>
+                {countdown.complete ? (
+                  <p className="font-serif text-lg font-bold text-[#3B1A08]">The celebration has begun! ✨</p>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2">
+                    {[
+                      { label: "Days", value: countdown.days },
+                      { label: "Hours", value: countdown.hours },
+                      { label: "Minutes", value: countdown.minutes },
+                      { label: "Seconds", value: countdown.seconds },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-lg border border-[#804418]/20 bg-[#FFF0C4]/35 py-2">
+                        <p className="font-mono text-xl font-black tabular-nums text-[#3B1A08] sm:text-2xl">{String(item.value).padStart(2, "0")}</p>
+                        <p className="text-[8px] font-bold uppercase tracking-wider text-[#714016]">{item.label}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <p className="mt-2 text-[9px] font-semibold text-[#714016]/85">5 November 2026 • 6:00 PM IST</p>
               </div>
 
               <div className="relative mb-5">
