@@ -1,6 +1,14 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+// ---------------- SUPABASE CREDENTIALS ----------------
+// Paste your Supabase Project URL and publishable (anon) key here.
+// Never use the service_role / secret key in browser-side code.
+const SUPABASE_URL = "https://hbvysrcyyxoemorrlyqt.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhidnlzcmN5eXhvZW1vcnJseXF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5MzY5ODgsImV4cCI6MjEwNDUxMjk4OH0.CXOyZ65nqxWbCudFF2hvQlduiXDWjSJ0iWm1RrHIRZs";
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Sparkles, MapPin, Calendar, Clock, Volume2, VolumeX, Send, ShieldCheck, Flame } from "lucide-react";
@@ -208,6 +216,18 @@ export default function RocketDiwaliInvite() {
   const [countdown, setCountdown] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, complete: false });
   const [cursorPos, setCursorPos] = useState({ x: 500, y: 600 });
 
+  // Guest-specific secret mission loaded from Supabase using ?guest=slug
+  const [guestSlug, setGuestSlug] = useState("");
+  const [mission, setMission] = useState<{
+    guest_name: string;
+    mission_title: string;
+    mission_text: string;
+    mission_condition: string | null;
+  } | null>(null);
+  const [missionLoading, setMissionLoading] = useState(true);
+  const [missionError, setMissionError] = useState("");
+  const [showMission, setShowMission] = useState(false);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const strikeStripRef = useRef<HTMLDivElement>(null);
   const fuseRef = useRef<HTMLDivElement>(null);
@@ -234,6 +254,51 @@ export default function RocketDiwaliInvite() {
       pointerPos.current = { x: window.innerWidth * 0.24, y: window.innerHeight * 0.59 };
       lastPointerRef.current.time = Date.now();
     }
+  }, []);
+
+  // Read the guest slug from the URL and load that guest's mission.
+  // Example: yoursite.vercel.app/?guest=mitali
+  useEffect(() => {
+    const slug = new URLSearchParams(window.location.search)
+      .get("guest")
+      ?.trim()
+      .toLowerCase();
+
+    if (!slug) {
+      setMissionLoading(false);
+      return;
+    }
+
+    setGuestSlug(slug);
+    let cancelled = false;
+
+    async function fetchMission() {
+      const { data, error } = await supabase
+        .from("diwali_guests")
+        .select("guest_name, mission_title, mission_text, mission_condition")
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        console.error("Supabase mission error:", error);
+        setMissionError("We couldn't load your secret letter. Please try opening the link again.");
+      } else if (!data) {
+        setMissionError("No secret mission was found for this link. Please check your invitation link.");
+      } else {
+        setMission(data);
+      }
+
+      setMissionLoading(false);
+    }
+
+    fetchMission();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Live countdown to 5 November 2026, 6:00 PM (Jaipur / IST).
@@ -758,7 +823,7 @@ export default function RocketDiwaliInvite() {
 
       {/* Invitation reveal after the rocket launches */}
       {stage === "revealed" && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center overflow-y-auto bg-[#100703]/75 p-4 backdrop-blur-md sm:p-6">
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-start gap-5 overflow-y-auto bg-[#100703]/75 p-4 pb-8 pt-6 backdrop-blur-md sm:justify-center sm:p-6 sm:pb-8">
           <motion.div
             style={{
               rotateX,
@@ -832,23 +897,6 @@ export default function RocketDiwaliInvite() {
                 <p className="mt-2 text-[9px] font-semibold text-[#714016]/85">5 November 2026 • 6:00 PM IST</p>
               </div>
 
-              <div className="relative mb-5">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-[#75400F]">Pick your vibe for the night</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {roles.map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => setSelectedRole(role)}
-                      className={`rounded-xl border p-2.5 text-left text-xs transition-all ${
-                        selectedRole === role
-                          ? "border-[#4A2108] bg-[#54270B] font-bold text-[#FFF0C4] shadow-[0_3px_12px_rgba(70,29,5,0.22)]"
-                          : "border-[#804418]/25 bg-[#6A330C]/[0.05] text-[#55290C] hover:border-[#62300D]/60 hover:bg-[#6A330C]/[0.09]"
-                      }`}
-                    >{role}</button>
-                  ))}
-                </div>
-              </div>
-
               <button
                 onClick={handleWhatsAppRSVP}
                 className="relative flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#f8d985] via-amber-300 to-[#d97706] py-3.5 text-[10px] font-black uppercase tracking-[0.19em] text-[#2A1205] shadow-[0_0_30px_rgba(90,39,5,0.18)] transition hover:brightness-110 active:scale-[0.98] sm:text-xs"
@@ -857,6 +905,93 @@ export default function RocketDiwaliInvite() {
               </button>
             </div>
           </motion.div>
+
+          {/* Personal secret mission letter */}
+          {guestSlug && (
+            <div className="my-2 w-full max-w-md">
+              {missionLoading ? (
+                <div className="rounded-2xl border border-amber-300/25 bg-[#241006]/95 p-5 text-center text-amber-100 shadow-2xl">
+                  <p className="font-serif text-lg">Preparing your personal letter...</p>
+                  <p className="mt-1 text-xs text-amber-200/70">A little secret is on its way ✨</p>
+                </div>
+              ) : missionError ? (
+                <div className="rounded-2xl border border-red-300/25 bg-[#241006]/95 p-5 text-center text-amber-100 shadow-2xl">
+                  <p className="font-serif text-lg">Your secret letter</p>
+                  <p className="mt-2 text-sm text-amber-100/80">{missionError}</p>
+                </div>
+              ) : mission && !showMission ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 18 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.25 }}
+                  className="rounded-2xl border border-amber-300/35 bg-gradient-to-br from-[#3a1b0b] via-[#241006] to-[#160903] p-5 text-center shadow-[0_15px_50px_rgba(0,0,0,0.45)] sm:p-6"
+                >
+                  <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-amber-400">A little something, just for you</p>
+                  <p className="mt-2 font-serif text-xl text-[#fff0c9]">Before you leave...</p>
+                  <p className="mt-2 text-sm leading-relaxed text-amber-100/75">
+                    There's a secret mission waiting with your name on it.
+                  </p>
+                  <button
+                    onClick={() => setShowMission(true)}
+                    className="mt-5 rounded-xl border border-amber-300/50 bg-gradient-to-r from-amber-200 via-amber-300 to-amber-500 px-6 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-[#351707] shadow-[0_0_25px_rgba(245,158,11,0.18)] transition hover:brightness-110 active:scale-[0.98]"
+                  >
+                    Open my secret letter ✉️
+                  </button>
+                </motion.div>
+              ) : mission && showMission ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 22, rotate: -1 }}
+                  animate={{ opacity: 1, y: 0, rotate: 0 }}
+                  transition={{ type: "spring", damping: 18, stiffness: 110 }}
+                  className="relative overflow-hidden rounded-[22px] border border-[#d7b77b]/70 bg-[#f5e7c8] p-5 text-[#3b2412] shadow-[0_18px_60px_rgba(0,0,0,0.5)] sm:p-7"
+                  style={{
+                    backgroundImage: "radial-gradient(circle at 15% 12%, rgba(255,255,255,.55), transparent 35%), linear-gradient(145deg, #f8edda 0%, #ead5ad 100%)",
+                  }}
+                >
+                  <div className="pointer-events-none absolute inset-2 rounded-[16px] border border-[#8a6338]/25" />
+                  <div className="relative">
+                    <div className="flex items-center justify-between border-b border-[#8a6338]/25 pb-3">
+                      <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-[#8a5725]">A confidential note</span>
+                      <span className="text-lg">✉️</span>
+                    </div>
+
+                    <p className="mt-5 font-serif text-sm italic text-[#76502d]">A Letter for</p>
+                    <h3 className="mt-1 font-serif text-3xl font-bold text-[#3b2412]">{mission.guest_name}</h3>
+                    <div className="my-4 text-[#a36b2c]">✦ ─── ❀ ─── ✦</div>
+
+                    <div className="rounded-xl border border-[#9a713f]/25 bg-white/35 p-4">
+                      <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#8a5725]">Your secret mission</p>
+                      <h4 className="mt-2 font-serif text-xl font-bold text-[#542f16]">{mission.mission_title}</h4>
+                      <p className="mt-3 text-sm leading-relaxed text-[#4b321d]">{mission.mission_text}</p>
+                    </div>
+
+                    {mission.mission_condition && (
+                      <div className="mt-4 rounded-xl border border-[#b7792d]/35 bg-[#e6c995]/45 p-4">
+                        <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#8a4f18]">⚠️ Special condition</p>
+                        <p className="mt-2 text-sm leading-relaxed text-[#4b321d]">{mission.mission_condition}</p>
+                      </div>
+                    )}
+
+                    {/* Rules that apply to every secret mission */}
+                    <div className="mt-4 rounded-xl border border-[#9a713f]/30 bg-[#ead8b8]/65 p-4">
+                      <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#8a5725]">📜 Rules of the mission</p>
+                      <ol className="mt-3 list-decimal space-y-2 pl-4 text-sm leading-relaxed text-[#4b321d]">
+                        <li>Complete your task between <strong>8:00 PM and 10:00 PM</strong>.</li>
+                        <li>Do not discuss your mission with anyone in the group. If you do, your task becomes invalid.</li>
+                        <li>Anyone who fails to complete their task—or completes it last—will face a punishment.</li>
+                        <li>Your task must be performed <strong>in front of everyone</strong>.</li>
+                      </ol>
+                    </div>
+
+                    <div className="mt-5 border-t border-[#8a6338]/25 pt-3 text-center">
+                      <p className="font-serif text-sm italic text-[#76502d]">Your mission, should you choose to accept it.</p>
+                      <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#a36b2c]">Keep it secret. Have fun. 🪔</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ) : null}
+            </div>
+          )}
         </div>
       )}
     </div>
